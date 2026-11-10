@@ -42,6 +42,29 @@ button:disabled{opacity:.6;cursor:wait}.toolbar{display:flex;gap:10px;flex-wrap:
 .dias{display:flex;align-items:flex-end;gap:5px;height:96px}.dias div{flex:1;display:flex;align-items:flex-end;gap:1px;height:100%}.dias i{flex:1;border-radius:2px 2px 0 0;background:var(--brand);min-height:2px}.dias i.r{background:var(--resuelto)}
 .leyenda{font-size:.8rem;color:var(--muted);margin-top:8px}.tw{overflow-x:auto}table.t{width:100%;border-collapse:collapse;font-size:.86rem}.t th,.t td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
 @media(max-width:650px){.dgrid{grid-template-columns:1fr}.bar{grid-template-columns:90px 1fr 28px}}
+body[data-view="tecnicos"] main.wrap{max-width:1600px}
+.tec{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.tec-izq,.tec-der{min-width:0}
+.tec-fijo{padding:20px;margin-bottom:16px}.tec-fijo .adminbar{margin-bottom:14px}.tec-fijo .toolbar{margin-bottom:0}
+.claverow{display:flex;gap:12px;align-items:flex-end;margin-bottom:14px}.claverow .field{flex:1;margin:0;min-width:0}
+.btn-act{background:var(--accent);border-color:var(--accent);color:#211b17;font-weight:600;white-space:nowrap;min-height:54px}
+.dgrid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+@media(min-width:981px){
+ body[data-view="tecnicos"]{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+ body[data-view="tecnicos"] main.wrap{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;padding-top:18px;padding-bottom:18px}
+ body[data-view="tecnicos"] #vTec{flex:1;min-height:0;display:flex}
+ .tec{flex:1;min-height:0;align-items:stretch}
+ .tec-izq{display:flex;flex-direction:column;min-height:0}
+ .tec-fijo{flex:none}
+ .tec-lista,.tec-der{overflow-y:auto;min-height:0;padding-right:4px}
+ .tec-lista{flex:1}
+}
+body[data-view="tecnicos"] header p{display:none}
+body[data-view="tecnicos"] header .wrap{padding-top:10px;padding-bottom:10px}
+body[data-view="tecnicos"] .marca img{height:36px}
+@media(max-width:980px){.tec{grid-template-columns:1fr}}
+@media(min-width:651px){.tec-lista .actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}}
+@media(max-width:650px){.claverow{flex-direction:column;align-items:stretch}.btn-act{width:100%}}
 </style>
 </head>
 <body data-view="publico">
@@ -76,17 +99,27 @@ button:disabled{opacity:.6;cursor:wait}.toolbar{display:flex;gap:10px;flex-wrap:
     </section>
   </div>
   <section id="vTec">
-    <section class="panel">
-      <div class="adminbar"><h2 style="margin:0">Panel de técnicos</h2><div><button id="volver" type="button">Volver al portal</button></div></div>
-      <div class="field"><label for="claveAdmin">Clave de administración</label><input id="claveAdmin" type="password" autocomplete="current-password" placeholder="Ingresa la clave configurada en Apps Script"><div class="hint">La clave se solicita para guardar cambios administrativos. No la compartas.</div></div>
-      <div class="toolbar">
-        <input id="buscar" type="search" aria-label="Buscar tickets" placeholder="Buscar por asunto, nombre o número">
-        <select id="fEstado" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option>Abierto</option><option>En proceso</option><option>Resuelto</option></select>
-        <select id="fPrio" aria-label="Filtrar por prioridad"><option value="">Toda prioridad</option><option>Alta</option><option>Media</option><option>Baja</option></select>
-        <button id="recargar" type="button">Actualizar lista</button>
+    <div class="tec">
+      <div class="tec-izq">
+        <div class="panel tec-fijo">
+          <div class="adminbar"><h2 style="margin:0">Panel de técnicos</h2><div><button id="volver" type="button">Volver al portal</button></div></div>
+          <div class="claverow">
+            <div class="field"><label for="claveAdmin">Clave de administración</label><input id="claveAdmin" type="password" autocomplete="current-password" placeholder="Ingresa la clave"></div>
+            <button id="recargar" type="button" class="btn-act">Actualizar lista</button>
+          </div>
+          <div class="toolbar">
+            <input id="buscar" type="search" aria-label="Buscar tickets" placeholder="Buscar ticket">
+            <select id="fEstado" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option>Abierto</option><option>En proceso</option><option>Resuelto</option></select>
+            <select id="fPrio" aria-label="Filtrar por prioridad"><option value="">Toda prioridad</option><option>Alta</option><option>Media</option><option>Baja</option></select>
+          </div>
+        </div>
+        <div class="tec-lista"><div id="lista"><div class="empty">Ingresa la clave y pulsa «Actualizar lista» para cargar los tickets.</div></div></div>
       </div>
-      <div class="stats" id="stats"></div><section class="dash" id="dash" aria-label="Indicadores de gestión"></section><div id="lista"><div class="empty">Ingresa la clave y pulsa «Actualizar lista» para cargar los tickets.</div></div>
-    </section>
+      <aside class="tec-der" aria-label="Indicadores">
+        <div class="stats" id="stats"></div>
+        <section class="dash" id="dash" aria-label="Indicadores de gestión"></section>
+      </aside>
+    </div>
   </section>
 </main>
 <div class="toast" id="toast" role="status"></div>
@@ -211,7 +244,7 @@ $("categoria").addEventListener("change",mostrarCaptura);$("captura").addEventLi
 $("previa").addEventListener("click",e=>{if(e.target.id==="quitarImg")quitarImagen();});
 document.addEventListener("paste",e=>{if($("capturaCampo").hidden)return;const f=[...(e.clipboardData?e.clipboardData.files:[])].find(x=>x.type.startsWith("image/"));if(f){procesarImagen(f);aviso("Captura pegada");}});
 mostrarCaptura();
-$("recargar").addEventListener("click",cargarTickets);$("volver").addEventListener("click",()=>{location.hash="";vista();});
+$("recargar").addEventListener("click",cargarTickets);$("claveAdmin").addEventListener("keydown",e=>{if(e.key==="Enter")cargarTickets();});$("volver").addEventListener("click",()=>{location.hash="";vista();});
 $("lista").addEventListener("click",e=>{const b=e.target.closest("[data-save]");if(b)guardarTicket(b.dataset.save,b);});
 ["buscar","fEstado","fPrio"].forEach(id=>$(id).addEventListener("input",renderAdmin));
 $("dash").addEventListener("change",e=>{if(e.target.id==="fPeriodo"){periodo=Number(e.target.value);dashboard();}});
