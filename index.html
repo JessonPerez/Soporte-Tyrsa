@@ -35,6 +35,13 @@ button:disabled{opacity:.6;cursor:wait}.toolbar{display:flex;gap:10px;flex-wrap:
 .confirm{margin-top:14px;font-weight:600}.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:white;padding:10px 16px;border-radius:7px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:10}.toast.on{opacity:1}
 .adminbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:16px}.small{font-size:.84rem;color:var(--muted)}
 @media(max-width:650px){.wrap{padding:0 14px}.panel{padding:20px}.row,.result-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.actions{grid-template-columns:1fr}.marca img{height:38px}header .wrap{align-items:flex-start}}
+.dash{margin:0 0 22px}.dashhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.dashhead h3{font-size:1.02rem;margin:0}.dashhead select{width:auto;min-height:42px;padding:8px 10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px}.kpi b{display:block;font-size:1.35rem;line-height:1.3}.kpi span{font-size:.82rem;color:var(--muted)}.kpi.mal b{color:var(--alta)}.kpi.bien b{color:var(--resuelto)}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.dcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}.dcard h4{margin:0 0 10px;font-size:.92rem}
+.bar{display:grid;grid-template-columns:120px 1fr 30px;gap:8px;align-items:center;font-size:.86rem;margin:7px 0}.bar i{display:block;height:10px;border-radius:5px;background:var(--brand)}.bar b{text-align:right}
+.dias{display:flex;align-items:flex-end;gap:5px;height:96px}.dias div{flex:1;display:flex;align-items:flex-end;gap:1px;height:100%}.dias i{flex:1;border-radius:2px 2px 0 0;background:var(--brand);min-height:2px}.dias i.r{background:var(--resuelto)}
+.leyenda{font-size:.8rem;color:var(--muted);margin-top:8px}.tw{overflow-x:auto}table.t{width:100%;border-collapse:collapse;font-size:.86rem}.t th,.t td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+@media(max-width:650px){.dgrid{grid-template-columns:1fr}.bar{grid-template-columns:90px 1fr 28px}}
 </style>
 </head>
 <body data-view="publico">
@@ -78,7 +85,7 @@ button:disabled{opacity:.6;cursor:wait}.toolbar{display:flex;gap:10px;flex-wrap:
         <select id="fPrio" aria-label="Filtrar por prioridad"><option value="">Toda prioridad</option><option>Alta</option><option>Media</option><option>Baja</option></select>
         <button id="recargar" type="button">Actualizar lista</button>
       </div>
-      <div class="stats" id="stats"></div><div id="lista"><div class="empty">Ingresa la clave y pulsa «Actualizar lista» para cargar los tickets.</div></div>
+      <div class="stats" id="stats"></div><section class="dash" id="dash" aria-label="Indicadores de gestión"></section><div id="lista"><div class="empty">Ingresa la clave y pulsa «Actualizar lista» para cargar los tickets.</div></div>
     </section>
   </section>
 </main>
@@ -139,10 +146,42 @@ async function enviar(){
 }
 function vista(){document.body.dataset.view=location.hash==="#tecnicos"?"tecnicos":"publico";}
 function stats(data){const c=s=>data.filter(t=>t.estado===s).length;$("stats").innerHTML=[["Total",data.length],["Abiertos",c("Abierto")],["En proceso",c("En proceso")],["Resueltos",c("Resuelto")]].map(([n,v])=>`<div class="stat"><b>${v}</b><span>${n}</span></div>`).join("");}
+const METAS_HORAS={Alta:4,Media:24,Baja:72}; // meta de resolución por prioridad, en horas corridas
+let periodo=30;
+function dur(ms){if(!isFinite(ms))return "—";const m=Math.round(ms/6e4);if(m<60)return m+" min";const h=Math.floor(m/60);if(h<24)return h+" h "+(m%60)+" min";return Math.floor(h/24)+" d "+(h%24)+" h";}
+function prom(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN;}
+function mediana(a){if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function barras(mapa){const e=Object.entries(mapa).sort((a,b)=>b[1]-a[1]),mx=Math.max(1,...e.map(x=>x[1]));return e.length?e.map(([k,v])=>`<div class="bar"><span>${esc(k)}</span><i style="width:${v/mx*100}%"></i><b>${v}</b></div>`).join(""):'<div class="small">Sin datos.</div>';}
+function dashboard(){
+ const box=$("dash"),ahora=Date.now(),desde=periodo?ahora-periodo*864e5:0,H=36e5;
+ const ms=(a,b)=>new Date(b)-new Date(a),meta=t=>(METAS_HORAS[t.prioridad]||24)*H;
+ const sel=`<select id="fPeriodo" aria-label="Periodo">${[[7,"Últimos 7 días"],[30,"Últimos 30 días"],[90,"Últimos 90 días"],[0,"Todo el historial"]].map(([v,n])=>`<option value="${v}"${v===periodo?" selected":""}>${n}</option>`).join("")}</select>`;
+ const L=tickets.filter(t=>new Date(t.fecha).getTime()>=desde);
+ const res=L.filter(t=>t.estado==="Resuelto"&&t.fechaResolucion);
+ const tRes=res.map(t=>ms(t.fecha,t.fechaResolucion)).filter(x=>x>=0);
+ const tAt=L.filter(t=>t.fechaAtencion).map(t=>ms(t.fecha,t.fechaAtencion)).filter(x=>x>=0);
+ const enMeta=res.filter(t=>ms(t.fecha,t.fechaResolucion)<=meta(t)).length;
+ const cumpl=res.length?Math.round(enMeta/res.length*100):null;
+ const pend=L.filter(t=>t.estado!=="Resuelto"),venc=pend.filter(t=>ahora-new Date(t.fecha)>meta(t));
+ const viejo=pend.length?Math.max(...pend.map(t=>ahora-new Date(t.fecha))):NaN;
+ const cat={},rp={};
+ L.forEach(t=>{const c=t.categoria||"Sin categoría";cat[c]=(cat[c]||0)+1;if(t.responsable){const r=rp[t.responsable]=rp[t.responsable]||{n:0,ok:0,t:[]};r.n++;if(t.estado==="Resuelto"&&t.fechaResolucion){r.ok++;const x=ms(t.fecha,t.fechaResolucion);if(x>=0)r.t.push(x);}}});
+ const dias=[...Array(14)].map((_,i)=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-13+i);return d;});
+ const mismo=(f,d)=>{if(!f)return false;const x=new Date(f);return x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth()&&x.getDate()===d.getDate();};
+ const cre=dias.map(d=>tickets.filter(t=>mismo(t.fecha,d)).length),cer=dias.map(d=>tickets.filter(t=>mismo(t.fechaResolucion,d)).length),mx=Math.max(1,...cre,...cer);
+ const kpi=(v,n,c)=>`<div class="kpi ${c||""}"><b>${v}</b><span>${n}</span></div>`;
+ const filasR=Object.entries(rp).sort((a,b)=>b[1].ok-a[1].ok).map(([n,r])=>`<tr><td>${esc(n)}</td><td>${r.n}</td><td>${r.ok}</td><td>${dur(prom(r.t))}</td></tr>`).join("");
+ box.innerHTML=`<div class="dashhead"><h3>Indicadores de gestión</h3>${sel}</div>`+(!L.length?'<div class="empty">No hay tickets en este periodo.</div>':
+ `<div class="kpis">${kpi(dur(prom(tRes)),"Tiempo promedio de resolución"+(tRes.length?" · mediana "+dur(mediana(tRes)):""))}${kpi(tAt.length?dur(prom(tAt)):"—","Primera atención (promedio)")}${kpi(cumpl===null?"—":cumpl+"%","Resueltos dentro de la meta",cumpl===null?"":cumpl>=80?"bien":"mal")}${kpi(venc.length,"Pendientes fuera de meta",venc.length?"mal":"bien")}${kpi(dur(viejo),"Pendiente más antiguo")}</div>
+ <div class="dgrid"><div class="dcard"><h4>Tickets por categoría</h4>${barras(cat)}</div>
+ <div class="dcard"><h4>Últimos 14 días</h4><div class="dias" role="img" aria-label="Tickets creados y resueltos por día">${dias.map((d,i)=>`<div title="${d.toLocaleDateString("es-GT")}: ${cre[i]} creados, ${cer[i]} resueltos"><i style="height:${cre[i]/mx*100}%"></i><i class="r" style="height:${cer[i]/mx*100}%"></i></div>`).join("")}</div><div class="leyenda"><span style="color:var(--brand)">■</span> Creados · <span style="color:var(--resuelto)">■</span> Resueltos</div></div>
+ <div class="dcard" style="grid-column:1/-1"><h4>Por responsable</h4>${filasR?`<div class="tw"><table class="t"><tr><th>Responsable</th><th>Asignados</th><th>Resueltos</th><th>Tiempo promedio</th></tr>${filasR}</table></div>`:'<div class="small">Aún no hay tickets asignados.</div>'}</div></div>
+ <div class="leyenda">Metas de resolución: ${Object.entries(METAS_HORAS).map(([k,v])=>k+" "+v+" h").join(" · ")}. Los tiempos se cuentan en horas corridas. La primera atención solo se registra en tickets gestionados desde esta versión.</div>`);
+}
 function renderAdmin(){
  const q=$("buscar").value.trim().toLowerCase(),fe=$("fEstado").value,fp=$("fPrio").value;
  const vis=tickets.filter(t=>(!fe||t.estado===fe)&&(!fp||t.prioridad===fp)&&(!q||(`${t.asunto} ${t.nombre} ${t.id}`).toLowerCase().includes(q)));
- stats(tickets);
+ stats(tickets);dashboard();
  if(!vis.length){$("lista").innerHTML='<div class="empty">No hay tickets que coincidan con los filtros.</div>';return;}
  $("lista").innerHTML=vis.map(t=>{
   const opts=ESTADOS.map(s=>`<option ${s===t.estado?"selected":""}>${s}</option>`).join("");
@@ -163,7 +202,7 @@ async function guardarTicket(id,btn){
  const responsable=card.querySelector(".resp").value,estado=card.querySelector(".estado").value;
  btn.disabled=true;btn.textContent="Guardando…";
  try{const d=await apiPost({action:"update",adminKey:clave,id:Number(id),responsable,estado});if(!d.ok)throw Error(d.error||"Error");
-  const t=tickets.find(x=>String(x.id)===String(id));if(t){t.estado=d.estado;t.responsable=d.responsable;t.fechaResolucion=d.fechaResolucion;}
+  const t=tickets.find(x=>String(x.id)===String(id));if(t){t.estado=d.estado;t.responsable=d.responsable;t.fechaResolucion=d.fechaResolucion;t.fechaAtencion=d.fechaAtencion;}
   renderAdmin();aviso("Ticket #"+id+" actualizado"+(d.correo?" y se avisó al usuario por correo":""));}
  catch(e){aviso("No se pudo actualizar: "+(e.message||"error"));btn.disabled=false;btn.textContent="Guardar cambios";}
 }
@@ -175,6 +214,7 @@ mostrarCaptura();
 $("recargar").addEventListener("click",cargarTickets);$("volver").addEventListener("click",()=>{location.hash="";vista();});
 $("lista").addEventListener("click",e=>{const b=e.target.closest("[data-save]");if(b)guardarTicket(b.dataset.save,b);});
 ["buscar","fEstado","fPrio"].forEach(id=>$(id).addEventListener("input",renderAdmin));
+$("dash").addEventListener("change",e=>{if(e.target.id==="fPeriodo"){periodo=Number(e.target.value);dashboard();}});
 window.addEventListener("hashchange",vista);vista();
 </script>
 </body>
