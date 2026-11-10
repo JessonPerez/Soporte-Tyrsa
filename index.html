@@ -4,22 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Soporte IT · Tickets</title>
+<link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef2f6;--surface:#fff;--ink:#14202e;--muted:#5b6b7c;--line:#d5dde6;--accent:#0b6e8a;--accent-ink:#fff;
---alta:#b4331f;--media:#a86a00;--baja:#2f7a4d;--abierto:#0b6e8a;--proceso:#7a4fb0;--resuelto:#2f7a4d;
+/* Colores de Corporación Tyrsa: naranja #f26522 y gris #62666a. Para cambiar la marca, edita --brand. */
+:root{--bg:#f4f4f5;--surface:#fff;--ink:#2b2d30;--muted:#5f6368;--line:#dcdde0;--brand:#f26522;--accent:var(--brand);--accent-ink:#1f2023;
+--alta:#b3261e;--media:#8a5a00;--baja:#2f7a4d;--abierto:#c2490c;--proceso:#6d4aa6;--resuelto:#2f7a4d;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1720;--surface:#18232f;--ink:#e6edf4;--muted:#93a4b5;--line:#2a3948;--accent:#4fb6d3;--accent-ink:#06222c;
---alta:#ff8a76;--media:#f0b44c;--baja:#6fcf94;--abierto:#4fb6d3;--proceso:#b99be6;--resuelto:#6fcf94}}
-:root[data-theme="dark"]{--bg:#0f1720;--surface:#18232f;--ink:#e6edf4;--muted:#93a4b5;--line:#2a3948;--accent:#4fb6d3;--accent-ink:#06222c;
---alta:#ff8a76;--media:#f0b44c;--baja:#6fcf94;--abierto:#4fb6d3;--proceso:#b99be6;--resuelto:#6fcf94}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1b1d;--surface:#252629;--ink:#ececee;--muted:#a1a4aa;--line:#3a3c40;--accent:var(--brand);--accent-ink:#1f2023;
+--alta:#ff8a76;--media:#f0b44c;--baja:#6fcf94;--abierto:#ff8a4d;--proceso:#b99be6;--resuelto:#6fcf94}}
+:root[data-theme="dark"]{--bg:#1a1b1d;--surface:#252629;--ink:#ececee;--muted:#a1a4aa;--line:#3a3c40;--accent:var(--brand);--accent-ink:#1f2023;
+--alta:#ff8a76;--media:#f0b44c;--baja:#6fcf94;--abierto:#ff8a4d;--proceso:#b99be6;--resuelto:#6fcf94}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
-header{background:var(--surface);border-bottom:1px solid var(--line)}
+header{background:var(--surface);border-bottom:3px solid var(--accent)}
+.marca{display:flex;align-items:center;gap:12px}
+.marca img{height:40px;width:auto;display:block;background:#fff;border-radius:6px;padding:4px 8px}
 .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
-header .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
+header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
 h1{font-size:1.35rem;font-weight:600;margin:0}
 header p{margin:0;color:var(--muted);font-size:.95rem}
 main{padding-top:24px;padding-bottom:40px}
@@ -70,7 +74,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--a
 </head>
 <body data-view="publico">
 <header><div class="wrap">
-  <h1>Soporte IT</h1>
+  <div class="marca"><img src="logo.png" alt="Logo de la empresa" onerror="this.remove()"><h1>Soporte IT</h1></div>
   <p>Reporta un problema y consulta el estado de tu ticket.</p>
 </div></header>
 
@@ -99,7 +103,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--a
     <h2 id="t-consulta">Consultar un ticket</h2>
     <label for="numero">Número de ticket</label>
     <div class="toolbar" style="margin-bottom:0">
-      <input id="numero" inputmode="numeric" placeholder="Por ejemplo, 1003">
+      <input id="numero" inputmode="numeric" placeholder="Por ejemplo, 3">
       <button type="button" id="consultar">Consultar</button>
     </div>
     <div class="resultado" id="resultado" role="status"></div>
@@ -120,7 +124,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--a
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const KEY = "tickets-it-v1";
+const KEY = "tickets-it-v2";
 // URL de la aplicación web de Google Apps Script (ver README). Si queda vacía, el portal funciona en modo local.
 const API_URL = "https://script.google.com/macros/s/AKfycby_aGC-z2FTXwM9bh_akDrverncGQzQkbd9qFCH0TSt7Vtbr35hYaa6FnkUMrPl04E/exec";
 const ESTADOS = {abierto:"Abierto", proceso:"En proceso", resuelto:"Resuelto"};
@@ -130,9 +134,9 @@ const $ = id => document.getElementById(id);
 function ejemplo(){
   const h = n => new Date(Date.now() - n*3600e3).toISOString();
   return [
-    {id:1003,nombre:"Marta López",correo:"marta@empresa.com",categoria:"Accesos y contraseñas",prioridad:"alta",asunto:"No puedo entrar al sistema de facturación",desc:"Después del cambio de contraseña me aparece «usuario bloqueado».",estado:"abierto",fecha:h(2)},
-    {id:1002,nombre:"Carlos Pérez",correo:"carlos@empresa.com",categoria:"Red",prioridad:"media",asunto:"WiFi intermitente en la sala 2",desc:"Se corta cada 10 minutos durante las reuniones.",estado:"proceso",fecha:h(26)},
-    {id:1001,nombre:"Ana Ruiz",correo:"ana@empresa.com",categoria:"Hardware",prioridad:"baja",asunto:"Solicitud de segundo monitor",desc:"Necesito un monitor adicional para el puesto 14.",estado:"resuelto",fecha:h(70)}
+    {id:3,nombre:"Marta López",correo:"marta@empresa.com",categoria:"Accesos y contraseñas",prioridad:"alta",asunto:"No puedo entrar al sistema de facturación",desc:"Después del cambio de contraseña me aparece «usuario bloqueado».",estado:"abierto",fecha:h(2)},
+    {id:2,nombre:"Carlos Pérez",correo:"carlos@empresa.com",categoria:"Red",prioridad:"media",asunto:"WiFi intermitente en la sala 2",desc:"Se corta cada 10 minutos durante las reuniones.",estado:"proceso",fecha:h(26)},
+    {id:1,nombre:"Ana Ruiz",correo:"ana@empresa.com",categoria:"Hardware",prioridad:"baja",asunto:"Solicitud de segundo monitor",desc:"Necesito un monitor adicional para el puesto 14.",estado:"resuelto",fecha:h(70)}
   ];
 }
 let tickets = [];
@@ -204,7 +208,7 @@ async function enviar(){
     catch(e){ aviso("No se pudo enviar el ticket. Inténtalo de nuevo."); return; }
     finally { btn.disabled = false; btn.textContent = "Enviar ticket"; }
   } else {
-    id = tickets.reduce((m,t) => Math.max(m,t.id), 1000) + 1;
+    id = tickets.reduce((m,t) => Math.max(m,t.id), 0) + 1;
     tickets.unshift({id, ...datos, estado:"abierto", fecha:new Date().toISOString()});
     guardar();
     render();
@@ -250,5 +254,7 @@ vista();
 render();
 </script>
 </body>
+</html>
+
 </html>
 
