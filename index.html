@@ -121,6 +121,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--a
 
 <script>
 const KEY = "tickets-it-v1";
+// URL de la aplicación web de Google Apps Script (ver README). Si queda vacía, el portal funciona en modo local.
+const API_URL = "https://script.google.com/macros/s/AKfycby_aGC-z2FTXwM9bh_akDrverncGQzQkbd9qFCH0TSt7Vtbr35hYaa6FnkUMrPl04E/exec";
 const ESTADOS = {abierto:"Abierto", proceso:"En proceso", resuelto:"Resuelto"};
 const PRIO = {alta:"Alta", media:"Media", baja:"Baja"};
 const $ = id => document.getElementById(id);
@@ -142,6 +144,11 @@ function fmt(iso){ return new Date(iso).toLocaleString("es", {day:"numeric",mont
 function aviso(t){ const el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(aviso.t); aviso.t = setTimeout(() => el.classList.remove("on"), 2200); }
 
 function render(){
+  if (API_URL){
+    $("stats").innerHTML = "";
+    $("lista").innerHTML = '<div class="empty">Los tickets se guardan en tu hoja de Google Sheets. Gestiona los estados directamente en la columna Estado.</div>';
+    return;
+  }
   const q = $("buscar").value.trim().toLowerCase(), fe = $("fEstado").value, fp = $("fPrio").value;
   const cuenta = k => tickets.filter(t => t.estado === k).length;
   $("stats").innerHTML = [["Total",tickets.length],["Abiertos",cuenta("abierto")],["En proceso",cuenta("proceso")],["Resueltos",cuenta("resuelto")]]
@@ -166,7 +173,21 @@ function render(){
 }
 
 function error(campo, msg){ $("e-" + campo).textContent = msg; return !msg; }
-function enviar(){
+async function crearRemoto(v){
+  const r = await fetch(API_URL, {method:"POST", body:JSON.stringify(v)});
+  const d = await r.json();
+  if (!d.ok) throw new Error(d.error || "error");
+  return d.id;
+}
+async function consultarRemoto(n){
+  const r = await fetch(API_URL + "?id=" + encodeURIComponent(n));
+  return r.json();
+}
+function claseEstado(txt){
+  const t = String(txt).toLowerCase();
+  return t.includes("proceso") ? "proceso" : t.includes("resuel") ? "resuelto" : "abierto";
+}
+async function enviar(){
   const v = {nombre:$("nombre").value.trim(), correo:$("correo").value.trim(), asunto:$("asunto").value.trim(), desc:$("desc").value.trim()};
   let ok = true;
   ok = error("nombre", v.nombre ? "" : "Escribe tu nombre.") && ok;
@@ -174,11 +195,21 @@ function enviar(){
   ok = error("asunto", v.asunto ? "" : "Resume el problema en una línea.") && ok;
   ok = error("desc", v.desc.length >= 10 ? "" : "Describe el problema con al menos 10 caracteres.") && ok;
   if (!ok) return;
-  const id = tickets.reduce((m,t) => Math.max(m,t.id), 1000) + 1;
-  tickets.unshift({id, ...v, categoria:$("categoria").value, prioridad:$("prioridad").value, estado:"abierto", fecha:new Date().toISOString()});
-  guardar();
+  const datos = {...v, categoria:$("categoria").value, prioridad:$("prioridad").value};
+  let id;
+  if (API_URL){
+    const btn = $("enviar");
+    btn.disabled = true; btn.textContent = "Enviando…";
+    try { id = await crearRemoto(datos); }
+    catch(e){ aviso("No se pudo enviar el ticket. Inténtalo de nuevo."); return; }
+    finally { btn.disabled = false; btn.textContent = "Enviar ticket"; }
+  } else {
+    id = tickets.reduce((m,t) => Math.max(m,t.id), 1000) + 1;
+    tickets.unshift({id, ...datos, estado:"abierto", fecha:new Date().toISOString()});
+    guardar();
+    render();
+  }
   ["asunto","desc"].forEach(i => $(i).value = "");
-  render();
   aviso("Ticket #" + id + " enviado");
   $("ok").textContent = "Tu número de ticket es #" + id + ". Guárdalo para consultar el estado.";
 }
@@ -194,13 +225,22 @@ $("lista").addEventListener("click", e => {
   const id = e.target.dataset && e.target.dataset.del;
   if (id && confirm("¿Eliminar el ticket #" + id + "?")){ tickets = tickets.filter(t => t.id != id); guardar(); render(); aviso("Ticket eliminado"); }
 });
-function consultar(){
+async function consultar(){
   const n = parseInt($("numero").value.replace(/\D/g, ""), 10);
-  const r = $("resultado"), t = tickets.find(x => x.id === n);
+  const r = $("resultado");
   r.innerHTML = "";
   if (!n){ r.textContent = "Escribe el número de tu ticket."; return; }
-  if (!t){ r.textContent = "No encontramos el ticket #" + n + ". Revisa el número e inténtalo de nuevo."; return; }
-  r.innerHTML = `<b>Ticket #${t.id}</b><br>Estado: <span class="badge s-${t.estado}">${ESTADOS[t.estado]}</span>`;
+  let est = null;
+  if (API_URL){
+    r.textContent = "Consultando…";
+    try { const d = await consultarRemoto(n); if (d.ok) est = {txt:d.estado, cls:claseEstado(d.estado)}; }
+    catch(e){ r.textContent = "No se pudo consultar. Inténtalo de nuevo."; return; }
+  } else {
+    const t = tickets.find(x => x.id === n);
+    if (t) est = {txt:ESTADOS[t.estado], cls:t.estado};
+  }
+  if (!est){ r.textContent = "No encontramos el ticket #" + n + ". Revisa el número e inténtalo de nuevo."; return; }
+  r.innerHTML = `<b>Ticket #${n}</b><br>Estado: <span class="badge s-${est.cls}">${esc(est.txt)}</span>`;
 }
 $("consultar").addEventListener("click", consultar);
 $("numero").addEventListener("keydown", e => { if (e.key === "Enter") consultar(); });
@@ -211,3 +251,4 @@ render();
 </script>
 </body>
 </html>
+
